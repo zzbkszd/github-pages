@@ -1,0 +1,10 @@
+
+#开发模式
+devMode = true
+
+token = volunteer
+appId = wxd0c7310318ea92c6
+appSecret = fb97fb9c5e048f0df331ede64e8c33a3
+encryptMessage = false
+encodingAesKey = C98JeEqp0IrQTKycYt6dYth1FPr0JTcxrk3uXVQp1o7
+source_url = https://api.weixin.qq.com/cgi-bin/material/batchget_material?access_token=ACCESS_TOKEN

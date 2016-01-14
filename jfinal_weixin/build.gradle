@@ -1,0 +1,49 @@
+group 'xinou'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.bmuschko:gradle-tomcat-plugin:2.1'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'war'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+apply plugin: 'com.bmuschko.tomcat'
+
+tomcat {
+    httpPort = 8080
+    httpsPort = 8091
+    enableSSL = true
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+    compile(
+            'com.jfinal:jfinal:2.0',
+            'com.alibaba:druid:1.0.16',
+            'mysql:mysql-connector-java:5.1.38',
+            'com.jfinal:jfinal-weixin:1.7',
+            'ch.qos.logback:logback-core:1.1.3',
+            'ch.qos.logback:logback-classic:1.1.3',
+//            'org.apache.activemq:activemq-client:5.13.0',
+            'com.alibaba:fastjson:1.2.7'
+    )
+    providedCompile "javax:javaee-api:6.0"
+
+    def tomcatVersion = '7.0.59'
+    tomcat "org.apache.tomcat.embed:tomcat-embed-core:${tomcatVersion}",
+            "org.apache.tomcat.embed:tomcat-embed-logging-juli:${tomcatVersion}",
+            "org.apache.tomcat.embed:tomcat-embed-jasper:${tomcatVersion}"
+}
