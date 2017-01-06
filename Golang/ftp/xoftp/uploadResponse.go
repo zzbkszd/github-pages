@@ -16,24 +16,19 @@ type UploadResponse struct {
 //SendJsonp 发送jsonp消息
 func (ur *UploadResponse) SendJsonp(w http.ResponseWriter) {
 	fmt.Println("send message msg:", ur.Msg, " state : ", ur.State)
-
 	doc, err := json.Marshal(ur)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	jsonp := "xoCallback(" + string(doc) + ")"
-	fmt.Println(jsonp)
-	fmt.Fprintf(w, jsonp)
+	fmt.Fprintf(w, string(doc))
 }
 
 //Send 发送消息
 func (ur *UploadResponse) Send(w http.ResponseWriter) {
 	fmt.Println("send message msg:", ur.Msg, " state : ", ur.State)
-
 	doc, err := json.Marshal(ur)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	fmt.Println(string(doc))
 	fmt.Fprintf(w, string(doc))
 }

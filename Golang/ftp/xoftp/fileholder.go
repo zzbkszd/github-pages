@@ -7,6 +7,13 @@ import(
 	"strings"
 	"strconv"
 	"crypto/md5"
+	"image"
+	"ftp/imaging"
+	"net/http"
+	"github.com/astaxie/beego/logs"
+	"fmt"
+	"log"
+	"bytes"
 )
 
 /**
@@ -15,31 +22,42 @@ import(
 */
 
 type UploadFile struct {
-	data io.Reader // 文件数据
+	data bytes.Buffer // 文件数据
 	name string  //文件名
 	md5 string   //md5编码
+
 	urlroot string//url前缀
 	fsroot string //文件路径前缀
+	pack string //包名
+
 	dupcount int // 查重计数
 	issaved int //是否已经保存过：0：未保存，1：已保存
+
 }
+
 
 /**
 主操作，保存文件，并返回文件相对于根路径的访问路径
  */
 func (upload *UploadFile) save () (string,error) {
 
-	upload.md5 = calMd5(upload.data)
-	upload.checkDuplicate();
+	upload.md5 = calBufferMd5(upload.data)
 
 	//仅当未保存过的时候才保存文件
 	if(upload.issaved==0){
+		fmt.Printf("save new file to %s\n",upload.fsroot+upload.name)
 		//向磁盘存储文件
-		f, _ := os.OpenFile(upload.fsroot+upload.name, os.O_CREATE|os.O_WRONLY, 0660)
-		_,error := io.Copy(f, upload.data)
+		f, e := os.OpenFile(upload.fsroot+upload.name, os.O_CREATE|os.O_WRONLY, 0666)
+		if(e!=nil){
+			log.Printf("error with : %s when open new file %s\n",e.Error(),upload.fsroot+upload.name)
+		}
+		defer f.Close()
+		written,err :=upload.data.WriteTo(f)
+
+		fmt.Printf("save file finish, wirte %d bytes into disk.\n",written)
 		//存储完毕
-		if error != nil {
-			return "",error;
+		if err != nil {
+			return "",err;
 		}
 	}
 
@@ -57,7 +75,7 @@ func (upload *UploadFile) checkDuplicate() {
 func (upload *UploadFile) rename() {
 	path := upload.fsroot+upload.name;
 	ex := exist(path,upload.md5)
-	if ex==-1{
+	if ex==1{
 		upload.dupcount = upload.dupcount+1 //重复次数+1
 		fileext := filepath.Ext(upload.name) //获取扩展名
 		filename := strings.TrimSuffix(upload.name,fileext) // 获取文件名
@@ -75,7 +93,9 @@ func (upload *UploadFile) rename() {
 	return
 }
 
-// 检查文件或目录是否存在
+
+
+// 检查文件是否存在
 // 根据MD5判断重名文件是否重复，若重复则删除原文件
 // 如果由 filename 指定的文件或目录存在则返回 1，否则返回0，若文件已存在且MD5相等，返回2
 func exist(filename string,md5 string) int {
@@ -89,7 +109,7 @@ func exist(filename string,md5 string) int {
 	if ferr!=nil {
 		return 0
 	}
-	//若MD5相等，保存原文件
+	//若MD5相等，保存原文件,算作已存在
 	if calMd5(file) == md5{
 		return 2;
 	}
@@ -104,3 +124,93 @@ func calMd5(input io.Reader) string {
 	io.Copy(md5h, input)
 	return string(md5h.Sum([]byte(""))) //md5
 }
+//计算MD5值
+func calBufferMd5(input bytes.Buffer) string {
+	md5h := md5.New()
+	input.WriteTo(md5h)
+	return string(md5h.Sum([]byte(""))) //md5
+}
+
+/**
+本地图片文件
+ */
+type LocalFile struct {
+	uri string
+	data image.Image//图片数据
+	out string //输出文件路径
+	scalaTo float32 //缩放比例
+	scalaAsStr string//缩放尺寸字符串
+	scalaWidth int
+	scalaHeight int
+	cutStr string //裁剪属性字符串
+	cutStartX int
+	cutStartY int
+	cutWidth  int
+	cutHeight int
+
+}
+
+//将本地文件加载到内存,若读取文件出错则返回错误
+func (file *LocalFile) load () error{
+	path := "upload/"+file.uri
+	logs.Info(path)
+	f,err := os.Open(path)
+	if(err!=nil){
+		return err
+	}
+	defer f.Close()
+
+	img,ie := imaging.Decode(f)
+
+	if(ie!=nil){
+		return ie
+	}
+
+	file.data = img
+
+	return nil
+
+}
+
+//按比例缩放
+func (file *LocalFile) scala(s float32){
+
+	bound := file.data.Bounds()
+
+	dx := float32(bound.Dx())
+	dy := float32(bound.Dy())
+
+	fmt.Printf("before scala image size is %f*%f\n",dx,dy)
+
+	file.scalaWidth = int(dx*s)
+	file.scalaHeight = int(dy*s)
+
+	fmt.Printf("scala image as %f, to width %d * height %d\n",s,file.scalaWidth,file.scalaHeight)
+
+	dst := imaging.Resize(file.data, file.scalaWidth, file.scalaHeight, imaging.Lanczos)
+
+	file.data = dst
+
+}
+
+func (file *LocalFile) scalaAs(x,y int){
+	fmt.Printf("scala image to %d * %d\n",x,y)
+	file.scalaWidth = x
+	file.scalaHeight = y
+	dst := imaging.Fit(file.data, file.scalaWidth, file.scalaHeight, imaging.Lanczos)
+	file.data = dst
+}
+
+func (file *LocalFile) cut(x,y int){
+	fmt.Printf("cut image to %d * %d\n",x,y)
+	file.cutHeight = x
+	file.cutWidth = y
+	dst := imaging.Fill(file.data,x,y,imaging.Center,imaging.Lanczos)
+	file.data = dst
+}
+
+func (file *LocalFile) httpWrite (w http.ResponseWriter){
+	w.Header().Set("contentType","image/png")
+	imaging.Encode(w,file.data,imaging.PNG)
+}
+
