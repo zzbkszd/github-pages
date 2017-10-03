@@ -1,5 +1,0 @@
-这是一个Jfinal-weixin开发框架的实践
-
-使用在于初始化ApiConfig后，调用api包下的类就可以操作微信的api。
-实现MsgController就可以对微信的消息进行响应。
-返回的数据用OutMsg进行封装即可。
